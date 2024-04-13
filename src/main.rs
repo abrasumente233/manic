@@ -1,3 +1,4 @@
+use kdam::tqdm;
 use std::{
     collections::HashMap,
     fmt::Display,
@@ -18,33 +19,42 @@ fn main() {
     println!("{}", hints);
 
     // get list of allowed words
-    let allowed_words = include_str!("../allowed-words.txt")
+    let allowed_words = include_str!("../possible-words.txt")
+    // let allowed_words = include_str!("../allowed-words.txt")
         .lines()
         .map(|s| s.parse().unwrap())
         .collect::<Vec<Word>>();
 
-    // get hints distribution for a given opening guess
-    //let guess = "manic";
-    let guess = "manic";
+    // get hints distribution across all words
+    let mut words_entropy: Vec<(Word, Real)> = vec![];
 
-    // Assume equal probability for each word
-    let dist: HashMap<Hints, usize> = allowed_words.iter().map(|&word| check(guess, word)).fold(
-        HashMap::new(),
-        |mut acc, hint| {
-            *acc.entry(hint).or_insert(0) += 1;
-            acc
-        },
-    );
+    for &guess in tqdm!(allowed_words.iter()) {
+        let dist: HashMap<Hints, usize> = allowed_words
+            .iter()
+            .map(|&word| check(guess, word))
+            .fold(HashMap::new(), |mut acc, hint| {
+                *acc.entry(hint).or_insert(0) += 1;
+                acc
+            });
 
-    let entropy = dist
-        .iter()
-        .map(|(_, &count)| {
-            let p = count as Real / allowed_words.len() as Real;
-            -p * p.log2()
-        })
-        .sum::<Real>();
+        let entropy = dist
+            .iter()
+            .map(|(_, &count)| {
+                let p = count as Real / allowed_words.len() as Real;
+                -p * p.log2()
+            })
+            .sum::<Real>();
 
-    dbg!(entropy);
+        words_entropy.push((guess, entropy));
+    }
+
+    // sort by entropy in descending order
+    words_entropy.sort_by(|(_, a), (_, b)| b.partial_cmp(a).unwrap());
+
+    // print top 20
+    for (word, entropy) in words_entropy.iter().take(20) {
+        println!("{}: {}", word, entropy);
+    }
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
