@@ -1,8 +1,11 @@
 use std::{
+    collections::HashMap,
     fmt::Display,
     ops::{Index, IndexMut},
     str::FromStr,
 };
+
+type Real = f32;
 
 fn main() {
     let hints = Hints([
@@ -13,16 +16,45 @@ fn main() {
         Hint::Missing,
     ]);
     println!("{}", hints);
+
+    // get list of allowed words
+    let allowed_words = include_str!("../allowed-words.txt")
+        .lines()
+        .map(|s| s.parse().unwrap())
+        .collect::<Vec<Word>>();
+
+    // get hints distribution for a given opening guess
+    //let guess = "manic";
+    let guess = "manic";
+
+    // Assume equal probability for each word
+    let dist: HashMap<Hints, usize> = allowed_words.iter().map(|&word| check(guess, word)).fold(
+        HashMap::new(),
+        |mut acc, hint| {
+            *acc.entry(hint).or_insert(0) += 1;
+            acc
+        },
+    );
+
+    let entropy = dist
+        .iter()
+        .map(|(_, &count)| {
+            let p = count as Real / allowed_words.len() as Real;
+            -p * p.log2()
+        })
+        .sum::<Real>();
+
+    dbg!(entropy);
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 enum Hint {
     Exact,
     Exist,
     Missing,
 }
 
-#[derive(Clone, Copy, PartialEq, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct Hints([Hint; 5]);
 
 impl Display for Hints {
@@ -38,7 +70,17 @@ impl Display for Hints {
     }
 }
 
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
 struct Word([char; 5]);
+
+impl Display for Word {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        for &c in self.0.iter() {
+            write!(f, "{}", c)?;
+        }
+        Ok(())
+    }
+}
 
 impl Index<usize> for Word {
     type Output = char;
